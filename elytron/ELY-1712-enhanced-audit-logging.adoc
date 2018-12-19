@@ -1,0 +1,283 @@
+= ELY-1712 Enhanced Audit Logging
+:author:            Justin Michael Cook
+:email:             jucook@redhat.com
+:toc:               left
+:icons:             font
+:idprefix:
+:idseparator:       -
+:issue-base-url:    https://issues.jboss.org/browse
+
+== Overview
+
+Currently, Audit Logging in Elytron does not have the same capabilities as Legacy Security. This task is to enhance Elytron Audit Logging to have the same capabilities as Legacy Security Audit Logging.
+
+== Issue Metadata
+
+=== Issue
+
+* https://issues.jboss.org/browse/ELY-1712[ELY-1712]
+
+=== Related Issues
+
+* https://issues.jboss.org/browse/EAP7-699[EAP7-699]
+
+=== Dev Contacts
+
+* mailto:{email}[{author}]
+
+=== QE Contacts
+
+* mailto:jkasik@redhat.com[Jan Kašík]
+
+=== Testing By
+
+[X] Engineering
+
+[ ] QE
+
+=== Affected Projects or Components
+
+* Security
+
+=== Other Interested Projects
+
+== Requirements
+
+=== Hard Requirements
+
+* Support for RFC 5424 should be enhanced, according to the following parameters, all of which should be added to the ```syslogAuditLogType``` in the Elytron schema
+// Could not find information about this in legacy
+** A ```syslog-format``` attribute should be added which supports a value of ```RFC5424```
+** Some of the parameters needed for RFC 5424 already exist in the Elytron codebase, which are the following:
+*** severity
+*** server address
+*** port
+*** setting TCP
+*** setting SSL
+*** setting socket factory
+*** setting hostname
+** The current attributes available in the Elytron schema, which will be used for RFC 5424, are:
+*** server-address
+*** port
+*** transport type
+*** message format
+*** hostname (?)
+*** ssl-context
+** Additional attributes which will need to be added are:
+*** include timeQuality
+*** include origin
+*** include meta
+*** facility values
+*** priority mapping from facility and severity values, in accordance with https://tools.ietf.org/html/rfc5424#page-9[RFC 5424 Section 6.2.1]
+** The following attributes will also be available, but should be discarded if timeQuality is not specified:
+*** tzKnown
+*** isSynced
+*** syncAccuracy
+** The following attributes will also be available, but should be discarded if origin is not specified:
+*** ip
+*** enterpriseId
+*** software
+*** swVersion
+** The following attributes will also be available, but should be discarded if meta is not specified:
+*** sequenceId
+*** sysUpTime
+*** language
+
+* Support for RFC 3164 should be added, based off of the implementation for RFC 5424 above, as such should also be added to the ```syslogAuditLogType``` in the Elytron schema
+** The ```syslog-format``` attribute described in the RFC 5424 section above should also support a value of ```RFC3164```
+** All parts of RFC 3164 are included in the RFC 5424 specification, as such the support for RFC 3164 should be only
+changing the message format and not require any additional implementation
+** The implementation of the RFC 3164 message format can be implemented based on the https://github.com/kabir/tamper-detecting-audit-log/blob/master/src/main/java/org/jboss/audit/log/TcpSyslogHandler.java[tamper-detecting-audit-log]
+
+* Support for user formatted strings should be added
+** Currently, this feature does not have a way to be implemented
+
+* There should be the ability to specify a Java class should be logged by using an @Audit Java annotation, similarly to what was available in Picketbox
+
+* There should be the ability to configure routing, and create a custom filter allowing only a selection of events to be logged, based on several criteria, listed in the below table
+** In each case, the user should be able to specify the criteria, the value(s), and a list of configuration changes from the default values, such as a different destination
+** Specifying the criteria, the value(s), and the configuration changes should be done as follows:
+*** When the programmatic approach is used, a method call should be available to the endpoint which will accept a given criteria, the corresponding values, and the filtering options
+*** When the markup approach is used, the inputs should be specified via attributes ```criteria="supported_criteria"```, ```values="respective_value_input"```, ```filtering="option1=change,option2=change,..."```.
+When this approach is used, these attributes should be available as attributes under the ```auditLogType``` in the Elytron schema
+*** Further information on the criteria and values can be found in the first table below
+** Example for specifying a criteria which has string values:
+[source,java]
+----
+String criteria = "type";
+List<String> typeValues = new ArrayList<>(Arrays.asList("authentication", "failure"));
+Map<String, String> filtering = new HashMap<>();
+filtering.put("location", "/home/audit/logs");
+filtering.put("suffix", ".yyyy-MM-dd_HHmm");
+AuditEndpoint endpoint = PeriodicRotatingFileAuditEndpoint.builder()
+        .setTimeZone(UTC)
+        .setSuffix(".yyyy-MM-ww-dd-a-HH_mm")
+        .setLocation(logFile)
+        .setClock(clock)
+        .setFiltering(criteria, typeValues, filtering)
+        .build();
+----
+[source,xml]
+----
+... criteria="type" values="authentication,failure" filtering="location='/home/audit/logs',suffix='.yyyy-MM-dd_HHmm'" ...
+----
+** Example for specifying a criteria which has int values
+[source,java]
+----
+String criteria = "facility";
+int lowRange = 0;
+int highRange = 15;
+Map<String, String> filtering = new HashMap<>();
+filtering.put("location", "/home/audit/logs");
+filtering.put("suffix", ".yyyy-MM-dd_HHmm");
+AuditEndpoint endpoint = PeriodicRotatingFileAuditEndpoint.builder()
+        .setTimeZone(UTC)
+        .setSuffix(".yyyy-MM-ww-dd-a-HH_mm")
+        .setLocation(logFile)
+        .setClock(clock)
+        .setFiltering(criteria, lowRange, highRange, filtering)
+        .build();
+----
+[source,xml]
+----
+... criteria="facility" values="0,15" filtering="location='/home/audit/logs',suffix='.yyyy-MM-dd_HHmm'" ...
+----
+
+* Logging should be done by using the proposal API as described in https://github.com/wildfly/wildfly-proposals/pull/181[WFCORE-4355]
+** A StdoutAuditEndpoint should be added to WildFly-Core that uses this API to log an event to Stdout
+** An AysncAuditEndpoint should be added to WildFly-Core that uses this API to log events to a queue before they're writing to Stdout
+** JsonSecurityEventFormatter should be moved to WildFly-Core and modified to use the JsonFormatter in this API
+** The current FileAuditEndpoints, FileAuditEndpoint, PeriodicRotatingFileAuditEndpoint, and SizeRotatingFileAuditEndpoint
+should be moved to WildFly-Core
+*** The API should be extended to provide the capability necessary for these Endpoints
+
+|===
+|Criteria |Possible Values |Method of Input
+
+| Type
+| Assertion, Audit Information (Syslog Event, Audit Log Enabled, etc), Authentication, Failure, Login, Permission, Successful, Unknown, Validation
+| Java String List for programmatically, comma separated list for markup
+
+| Facility
+| Values ranging from 0 to 23, as described in https://tools.ietf.org/html/rfc5424#page-9[RFC 5424 Section 6.2.1]
+| Two int values, first being the lower value and second being the higher value, for programmatically, lower value and higher value separated by a comma for markup
+
+| Severity
+| Values ranging from 0 to 7, as described in https://tools.ietf.org/html/rfc5424#page-9[RFC 5424 Section 6.2.1]
+| Two int values, first being the lower value and second being the higher value, for programmatically, lower value and higher value separated by a comma for markup
+
+| Priority
+| Values ranging from 0 to 191, calculated by multiplying the Facility value by 8 and adding the Severity value, as described in https://tools.ietf.org/html/rfc5424#page-9[RFC 5424 Section 6.2.1]
+| Two int values, first being the lower value and second being the higher value, for programmatically, lower value and higher value separated by a comma for markup
+
+| Level
+| FATAL, ERROR, WARN, INFO, DEBUG, TRACE
+| Java String List for programmatically, comma separated list for markup
+
+|===
+
+* Additional audit events should be added for feature parity with Legacy Security Audit Logging. The following tables makes a comparison of Legacy Security Audit Logging features included in, not included in, and if the feature should be added to Elytron Audit Logging:
+|===
+|Legacy Event | Needs to be added to Elytron
+//|Legacy Location
+
+| Rfc5424SyslogEvent
+| Yes
+//| testsuite/shared/.../syslogserver
+
+| CREATED_ASSERTION
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| RESPONSE_TO_SP
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| ERROR_RESPONSE_TO_SP
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| ERROR_SIG_VALIDATION
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| ERROR_TRUSTED_DOMAIN
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| EXPIRED_ASSERTION
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| LOGIN_INIT
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| LOGIN_COMPLETE
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| REQUEST_FROM_IDP
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| REQUEST_TO_IDP
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| RESPONSE_FROM_IDP
+| Yes
+//| picketlink/.../logging, picketlink/.../metrics, picketlink-federation/picketlink/.../audit
+
+| Invalid Authentication
+| Added Already
+//| picketbox/.../AuditUnitTestCase
+
+| Valid Authentication
+| Added Already
+//| picketbox/.../AuditUnitTestCase
+
+| Invalid Permission
+| Added Already
+//|
+
+| Valid Permission
+| Added Already
+//|
+
+| Audit Log Enabled
+| Yes
+//| wildfly-core/.../AuditLogToSyslogTestCase
+
+| Audit Log Disabled
+| Yes
+//| wildfly-core/.../AuditLogToSyslogTestCase
+
+|===
+* Additional customization attributes should be added based on community feedback, listed in the following table:
+|===
+|Feature |Available in Legacy Auditing |Support Case if Applicable |Implementation Required
+
+| "hostname" attribute
+| No
+| https://access.redhat.com/support/cases/#/case/02188481[Case 02188481]
+| Currently supported in Elytron Audit Logging resulting in just needing the attribute to be added to the management configuration
+
+| Less reliability for increased speed
+| Yes?
+| N/A
+| Ability to configure number of reconnect attempts to a syslog-server. Should be available as an attribute under ```syslogAuditLogType``` in the Elytron schema
+
+|===
+
+=== Nice-to-Have Requirements
+
+=== Non-Requirements
+
+== Test Plan
+
+Tests for the new Audit Logging capabilities will be added.
+
+== Community Documentation
+
+These new Audit Logging capabilities will be documented in the WildFly documentation under Audit.
