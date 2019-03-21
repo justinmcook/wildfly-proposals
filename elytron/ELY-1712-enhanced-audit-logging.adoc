@@ -48,40 +48,172 @@ Currently, Audit Logging in Elytron does not have the same capabilities as Legac
 * Support for RFC 5424 should be enhanced, according to the following parameters, all of which should be added to the ```syslogAuditLogType``` in the Elytron schema
 // Could not find information about this in legacy
 ** A ```syslog-format``` attribute should be added which supports a value of ```RFC5424```
-** Some of the parameters needed for RFC 5424 already exist in the Elytron codebase, which are the following:
-*** severity
-*** server address
-*** port
-*** setting TCP
-*** setting SSL
-*** setting socket factory
-*** setting hostname
-** The current attributes available in the Elytron schema, which will be used for RFC 5424, are:
-*** server-address
-*** port
-*** transport type
-*** message format
-*** hostname (?)
-*** ssl-context
-** Additional attributes which will need to be added are:
-*** include timeQuality
-*** include origin
-*** include meta
-*** facility values
-*** priority mapping from facility and severity values, in accordance with https://tools.ietf.org/html/rfc5424#page-9[RFC 5424 Section 6.2.1]
-** The following attributes will also be available, but should be discarded if timeQuality is not specified:
-*** tzKnown
-*** isSynced
-*** syncAccuracy
-** The following attributes will also be available, but should be discarded if origin is not specified:
-*** ip
-*** enterpriseId
-*** software
-*** swVersion
-** The following attributes will also be available, but should be discarded if meta is not specified:
-*** sequenceId
-*** sysUpTime
-*** language
+** Some of the parameters needed for RFC 5424 already exist in the Elytron codebase, which can be found in table 1
+** Additional attributes which will need to be added can be found in table 2
+** The attributes in table 3 will also be available, but should be discarded if timeQuality is not specified
+** The attributes in table 4 will also be available, but should be discarded if origin is not specified
+** The attributes in table 5 will also be available, but should be discarded if meta is not specified
+
+.Parameters Already Available in Elytron
+|===
+|Parameter |Type - User |Type - Output |Details |Schema Availability
+
+| Severity
+| N/A
+| N/A
+| Adding the values from https://tools.ietf.org/html/rfc5424#page-11[RFC 5424 Section 6.2.1]
+| N/A
+
+| Server Address
+| String
+| N/A
+| Where to direct the output to
+| Already available
+
+| Port
+| integer
+| N/A
+| The port for sending the output to on the server
+| Already available
+
+| TCP
+| String
+| N/A
+| The transport protocol for sending the output
+| Already available
+
+| SSL Context
+| String
+| N/A
+| The SSL Context to use
+| Already available
+
+| Hostname
+| String
+| String
+| Identifies the machine sending the syslog message for use in the FQDN, see https://tools.ietf.org/html/rfc5424#page-13[RFC 5424 Section 6.2.4]
+| Already available
+
+|===
+
+// Move some to nice to have?
+.Parameters That Need to be Added to Elytron
+|===
+|Parameter |Type - User |Type - Output |Details |Schema Availability
+
+| timeQuality
+| boolean
+| String of "timeQuality"
+| Parameter to determine if it should be included
+| To be added
+
+| origin
+| boolean
+| String of "origin"
+| Parameter to determine if it should be included
+| To be added
+
+| meta
+| boolean
+| String of "meta"
+| Parameter to determine if it should be included
+| To be added
+
+| facility
+| N/A
+| N/A
+| Adding the values from https://tools.ietf.org/html/rfc5424#page-10[RFC 5424 Section 6.2.1]
+| N/A
+
+| priority
+| N/A
+| integer
+| Mapping from facility and severity values, in accordance with https://tools.ietf.org/html/rfc5424#page-9[RFC 5424 Section 6.2.1]
+| N/A
+
+// Move to nice to have?
+|===
+.timeQuality Parameters
+|===
+|Parameter |Type - User |Type - Output |Details |Schema Availability
+
+| tzKnown
+| boolean
+| String ("0" or "1")
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+| isSynced
+| boolean
+| String ("0" or "1")
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+// Might not be possible
+| syncAccuracy
+| boolean
+| String
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+|===
+
+// Move to nice to have?
+.origin Parameters
+|===
+|Parameter |Type - User |Type - Output |Details |Schema Availability
+
+| ip
+| boolean
+| String (textual representation of IP address, potentially multiple values)
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+// Should it be included?
+| enterpriseId
+| boolean
+| String (SMI Network Management Private Enterprise Code)
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+| software
+| boolean
+| String (maximum size of 48 characters)
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+| swVersion
+| boolean
+| String (maximum size of 32 characters)
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+|===
+
+// Move to nice to have?
+.meta Parameters
+|===
+|Parameter |Type - User |Type - Output |Details |Schema Availability
+
+| sequenceId
+| boolean
+| integer
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+| sysUpTime
+| boolean
+| String (decimal integer)
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+| language
+| boolean
+| String (language identifier)
+| User uses to indicate they wish it to be included, output is the value
+| To be added
+
+|===
 
 * Support for RFC 3164 should be added, based off of the implementation for RFC 5424 above, as such should also be added to the ```syslogAuditLogType``` in the Elytron schema
 ** The ```syslog-format``` attribute described in the RFC 5424 section above should also support a value of ```RFC3164```
@@ -92,8 +224,12 @@ changing the message format and not require any additional implementation
 * Support for user formatted strings should be added
 ** Currently, this feature does not have a way to be implemented
 
-* There should be the ability to specify a Java class should be logged by using an @Audit Java annotation, similarly to what was available in Picketbox
+* There should be the ability to specify a Java class should be logged by using an @Audit Java annotation, similarly to what was https://developer.jboss.org/wiki/PicketBoxSecurityAnnotations#jive_content_id_SecurityAudit_Annotation[available in Picketbox]
+** This annotation would be available to be added onto a class for signifying when that class is called it should be logged
 
+// How the user configures this/how it will be introduced into the WildFly model should be explained in greater detail
+// Change markup to reference CLI instead
+// For programmetic approach, reference https://developer.jboss.org/wiki/PicketBoxAudit
 * There should be the ability to configure routing, and create a custom filter allowing only a selection of events to be logged, based on several criteria, listed in the below table
 ** In each case, the user should be able to specify the criteria, the value(s), and a list of configuration changes from the default values, such as a different destination
 ** Specifying the criteria, the value(s), and the configuration changes should be done as follows:
@@ -117,6 +253,7 @@ AuditEndpoint endpoint = PeriodicRotatingFileAuditEndpoint.builder()
         .setFiltering(criteria, typeValues, filtering)
         .build();
 ----
+// Change to reference CLI instead
 [source,xml]
 ----
 ... criteria="type" values="authentication,failure" filtering="location='/home/audit/logs',suffix='.yyyy-MM-dd_HHmm'" ...
@@ -143,14 +280,6 @@ AuditEndpoint endpoint = PeriodicRotatingFileAuditEndpoint.builder()
 ... criteria="facility" values="0,15" filtering="location='/home/audit/logs',suffix='.yyyy-MM-dd_HHmm'" ...
 ----
 
-* Logging should be done by using the proposal API as described in https://github.com/wildfly/wildfly-proposals/pull/181[WFCORE-4355]
-** A StdoutAuditEndpoint should be added to WildFly-Core that uses this API to log an event to Stdout
-** An AysncAuditEndpoint should be added to WildFly-Core that uses this API to log events to a queue before they're writing to Stdout
-** JsonSecurityEventFormatter should be moved to WildFly-Core and modified to use the JsonFormatter in this API
-** The current FileAuditEndpoints, FileAuditEndpoint, PeriodicRotatingFileAuditEndpoint, and SizeRotatingFileAuditEndpoint
-should be moved to WildFly-Core
-*** The API should be extended to provide the capability necessary for these Endpoints
-
 |===
 |Criteria |Possible Values |Method of Input
 
@@ -176,6 +305,7 @@ should be moved to WildFly-Core
 
 |===
 
+// Clarify
 * Additional audit events should be added for feature parity with Legacy Security Audit Logging. The following tables makes a comparison of Legacy Security Audit Logging features included in, not included in, and if the feature should be added to Elytron Audit Logging:
 |===
 |Legacy Event | Needs to be added to Elytron
@@ -270,12 +400,22 @@ should be moved to WildFly-Core
 
 |===
 
+// Add names of the attributes for the model
+* Logging should be done by using the proposal API as described in https://github.com/wildfly/wildfly-proposals/pull/181[WFCORE-4355]
+** A StdoutAuditEndpoint should be added to WildFly-Core that uses this API to log an event to Stdout
+** An AysncAuditEndpoint should be added to WildFly-Core that uses this API to log events to a queue before they're writing to Stdout
+** JsonSecurityEventFormatter should be moved to WildFly-Core and modified to use the JsonFormatter in this API
+** The current FileAuditEndpoints, FileAuditEndpoint, PeriodicRotatingFileAuditEndpoint, and SizeRotatingFileAuditEndpoint
+should be moved to WildFly-Core
+*** The API should be extended to provide the capability necessary for these Endpoints
+
 === Nice-to-Have Requirements
 
 === Non-Requirements
 
 == Test Plan
 
+// Add more detail about where they will go
 Tests for the new Audit Logging capabilities will be added.
 
 == Community Documentation
